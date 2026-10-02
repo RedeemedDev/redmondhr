@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+{% block title %}{{ employee.name }} — RedmondHR{% endblock %}
+{% block content %}
+<div class="dl-row">
+  <div>
+    <h1>
+      {{ employee.name }}
+      {% if employee.is_demo %}<span class="badge badge-demo">DEMO</span>{% endif %}
+    </h1>
+    <p class="muted">Employee #{{ employee.id }} · Updated {{ employee.updated_at }}</p>
+  </div>
+  <div class="actions">
+    <a class="btn" href="/employees/{{ employee.id }}/edit">Edit</a>
+    <a class="btn btn-secondary" href="/employees">Back to list</a>
+  </div>
+</div>
+
+{% if employee.is_demo %}
+<div class="flash-warn">This is sample/demo data. Safe to edit or delete.</div>
+{% endif %}
+
+<div class="card">
+  <h2>Profile</h2>
+  <div class="form-grid">
+    <div class="kv"><dt>Date of birth</dt><dd>{{ employee.date_of_birth or '—' }}</dd></div>
+    <div class="kv"><dt>Wage</dt><dd>{{ employee.wage or '—' }}</dd></div>
+    <div class="kv full"><dt>Address</dt><dd>{{ employee.address or '—' }}</dd></div>
+    <div class="kv"><dt>Driver's license #</dt><dd>{{ employee.drivers_license_number or '—' }}</dd></div>
+    <div class="kv"><dt>DL expiration</dt><dd>{{ employee.drivers_license_expiry or '—' }}</dd></div>
+    <div class="kv sensitive"><dt>Health card # (sensitive)</dt><dd>{{ employee.health_card_number or '—' }}</dd></div>
+    <div class="kv sensitive"><dt>Health card expiration</dt><dd>{{ employee.health_card_expiry or '—' }}</dd></div>
+    <div class="kv"><dt>Company start date</dt><dd>{{ employee.company_start_date or '—' }} <span class="muted">(anniversary)</span></dd></div>
+    <div class="kv"><dt>Date of hire</dt><dd>{{ employee.date_of_hire or '—' }}</dd></div>
+    <div class="kv"><dt>Training stage</dt><dd>{{ employee.training_stage or '—' }}</dd></div>
+    <div class="kv"><dt>Training due</dt><dd>{{ employee.training_due_date or '—' }}</dd></div>
+    <div class="kv full"><dt>Notes</dt><dd>{{ employee.notes or '—' }}</dd></div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Wage &amp; promotion history</h2>
+  <p class="hint">Wage changes and Team Lead promotions, newest first.</p>
+  {% if wage_history %}
+  <table>
+    <thead>
+      <tr>
+        <th>Effective</th>
+        <th>Type</th>
+        <th>Wage</th>
+        <th>Note</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for h in wage_history %}
+      <tr>
+        <td>{{ h.effective_date }}</td>
+        <td>
+          {% if h.event_type == 'promotion' %}
+            <span class="badge badge-today">Team Lead / promotion</span>
+          {% else %}
+            Wage change
+          {% endif %}
+        </td>
+        <td>{{ h.amount or '—' }}</td>
+        <td>{{ h.note or '—' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">No wage or promotion history yet.</p>
+  {% endif %}
+
+  <form method="post" action="/employees/{{ employee.id }}/history" style="margin-top:1rem;">
+    <h3 style="margin-top:0;">Add history entry</h3>
+    <div class="form-grid">
+      <div>
+        <label for="event_type">Type</label>
+        <select id="event_type" name="event_type">
+          <option value="wage">Wage change</option>
+          <option value="promotion">Promoted to Team Lead</option>
+        </select>
+      </div>
+      <div>
+        <label for="effective_date">Effective date</label>
+        <input type="date" id="effective_date" name="effective_date">
+      </div>
+      <div>
+        <label for="amount">Wage (optional for promotion)</label>
+        <input type="text" id="amount" name="amount" placeholder="e.g. $30/hr">
+      </div>
+      <div class="full">
+        <label for="note">Note</label>
+        <input type="text" id="note" name="note" placeholder="Defaults to Promoted to Team Lead for promotions">
+      </div>
+    </div>
+    <div class="actions">
+      <button class="btn" type="submit">Add to history</button>
+    </div>
+  </form>
+</div>
+
+<div class="card">
+  <h2>Uploads — reviews &amp; disciplinary</h2>
+  <p class="hint">Files are stored under local <code>./data/uploads</code>. Large company docs can remain in cloud storage.</p>
+
+  {% if documents %}
+  <table>
+    <thead><tr><th>Type</th><th>File</th><th>Uploaded</th><th>Notes</th><th></th></tr></thead>
+    <tbody>
+    {% for d in documents %}
+      <tr>
+        <td>{{ d.doc_type }}</td>
+        <td><a href="/documents/{{ d.id }}/download">{{ d.original_filename }}</a></td>
+        <td>{{ d.uploaded_at }}</td>
+        <td>{{ d.notes or '—' }}</td>
+        <td>
+          <form method="post" action="/documents/{{ d.id }}/delete" onsubmit="return confirm('Delete this file?');">
+            <button class="btn btn-sm btn-danger" type="submit">Delete</button>
+          </form>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">No documents uploaded yet.</p>
+  {% endif %}
+
+  <form method="post" action="/employees/{{ employee.id }}/documents" enctype="multipart/form-data" style="margin-top:1rem;">
+    <div class="form-grid">
+      <div>
+        <label for="doc_type">Document type</label>
+        <select id="doc_type" name="doc_type">
+          {% for t in doc_types %}
+          <option value="{{ t }}">{{ t }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label for="file">File</label>
+        <input type="file" id="file" name="file" required>
+      </div>
+      <div class="full">
+        <label for="notes">Notes (optional)</label>
+        <input type="text" id="notes" name="notes">
+      </div>
+    </div>
+    <div class="actions">
+      <button class="btn" type="submit">Upload</button>
+    </div>
+  </form>
+</div>
+
+<div class="card">
+  <h2>Danger zone</h2>
+  <form method="post" action="/employees/{{ employee.id }}/delete"
+        onsubmit="return confirm('Permanently delete this employee and their uploads?');">
+    <button class="btn btn-danger" type="submit">Delete employee</button>
+  </form>
+</div>
+{% endblock %}

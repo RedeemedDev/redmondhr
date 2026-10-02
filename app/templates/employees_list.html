@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}Employees — RedmondHR{% endblock %}
+{% block content %}
+<div class="dl-row">
+  <div>
+    <h1>Employees</h1>
+    <p class="lead">Create, view, and update manager HR records.</p>
+  </div>
+  <div class="actions">
+    <a class="btn" href="/employees/new">Add employee</a>
+  </div>
+</div>
+
+<form class="card" method="get" action="/employees" style="display:flex;gap:0.5rem;align-items:end;">
+  <div style="flex:1;">
+    <label for="q">Search by name</label>
+    <input type="search" id="q" name="q" value="{{ q }}" placeholder="e.g. Chen">
+  </div>
+  <button class="btn btn-secondary" type="submit">Search</button>
+  {% if q %}<a class="btn btn-secondary" href="/employees">Clear</a>{% endif %}
+</form>
+
+<div class="card">
+  {% if employees %}
+  <table>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Hire / start</th>
+        <th>Training</th>
+        <th>Wage</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for e in employees %}
+      <tr>
+        <td>
+          <a href="/employees/{{ e.id }}"><strong>{{ e.name }}</strong></a>
+          {% if e.is_demo %}<span class="badge badge-demo">DEMO</span>{% endif %}
+        </td>
+        <td>
+          <span class="muted">Hire:</span> {{ e.date_of_hire or '—' }}<br>
+          <span class="muted">Start:</span> {{ e.company_start_date or '—' }}
+        </td>
+        <td>
+          {{ e.training_stage or '—' }}
+          {% if e.training_due_date %}<br><span class="muted">Due {{ e.training_due_date }}</span>{% endif %}
+        </td>
+        <td>{{ e.wage or '—' }}</td>
+        <td><a class="btn btn-sm btn-secondary" href="/employees/{{ e.id }}/edit">Edit</a></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">No employees yet. <a href="/employees/new">Add one</a>, or run <code>python scripts/load_demo.py</code>.</p>
+  {% endif %}
+</div>
+{% endblock %}

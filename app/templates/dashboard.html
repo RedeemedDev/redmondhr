@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — RedmondHR{% endblock %}
+{% block content %}
+<h1>Dashboard</h1>
+<p class="lead">Manager-only HR toolkit for {{ company_name }}. Records live locally; company-wide docs can stay in cloud storage.</p>
+
+<div class="grid">
+  <div class="stat">
+    <div class="n">{{ employee_count }}</div>
+    <div class="l">Employees</div>
+  </div>
+  <div class="stat">
+    <div class="n">{{ overdue|length }}</div>
+    <div class="l">Overdue items</div>
+  </div>
+  <div class="stat">
+    <div class="n">{{ soon|length }}</div>
+    <div class="l">Upcoming (next {{ window_days }}d)</div>
+  </div>
+</div>
+
+<div class="actions">
+  <a class="btn" href="/employees/new">Add employee</a>
+  <a class="btn btn-secondary" href="/notifications">All notifications</a>
+  <a class="btn btn-secondary" href="/reports">Reports</a>
+</div>
+
+{% if overdue %}
+<div class="card">
+  <h2>Overdue</h2>
+  <table>
+    <thead><tr><th>Employee</th><th>Item</th><th>Date</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+    {% for i in overdue %}
+      <tr>
+        <td><a href="/employees/{{ i.employee_id }}">{{ i.employee_name }}</a></td>
+        <td>{{ i.label }}{% if i.detail %} <span class="muted">({{ i.detail }})</span>{% endif %}</td>
+        <td>{{ i.event_date }}</td>
+        <td><span class="badge badge-overdue">{{ i.days }}d overdue</span></td>
+        <td>
+          <form method="post" action="/reminders/dismiss" style="margin:0">
+            <input type="hidden" name="event_key" value="{{ i.event_key }}">
+            <input type="hidden" name="employee_id" value="{{ i.employee_id }}">
+            <input type="hidden" name="kind" value="{{ i.kind }}">
+            <input type="hidden" name="event_date" value="{{ i.event_date }}">
+            <input type="hidden" name="next" value="/">
+            <button type="submit" class="btn btn-secondary">Clear</button>
+          </form>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+<div class="card">
+  <h2>Coming up ({{ window_days }} days)</h2>
+  {% if soon %}
+  <table>
+    <thead><tr><th>Employee</th><th>Item</th><th>Date</th><th>When</th><th></th></tr></thead>
+    <tbody>
+    {% for i in soon %}
+      <tr>
+        <td><a href="/employees/{{ i.employee_id }}">{{ i.employee_name }}</a></td>
+        <td>{{ i.label }}{% if i.detail %} <span class="muted">({{ i.detail }})</span>{% endif %}</td>
+        <td>{{ i.event_date }}</td>
+        <td>
+          {% if i.status == 'today' %}
+            <span class="badge badge-today">Today</span>
+          {% else %}
+            <span class="badge badge-upcoming">in {{ i.days }}d</span>
+          {% endif %}
+        </td>
+        <td>
+          <form method="post" action="/reminders/dismiss" style="margin:0">
+            <input type="hidden" name="event_key" value="{{ i.event_key }}">
+            <input type="hidden" name="employee_id" value="{{ i.employee_id }}">
+            <input type="hidden" name="kind" value="{{ i.kind }}">
+            <input type="hidden" name="event_date" value="{{ i.event_date }}">
+            <input type="hidden" name="next" value="/">
+            <button type="submit" class="btn btn-secondary">Clear</button>
+          </form>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">Nothing upcoming in this window.</p>
+  {% endif %}
+</div>
+
+{% if password_on %}
+<p class="muted"><a href="/logout">Sign out</a></p>
+{% endif %}
+{% endblock %}

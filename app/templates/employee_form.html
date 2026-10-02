@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} — RedmondHR{% endblock %}
+{% block content %}
+<h1>{{ title }}</h1>
+<p class="lead">Health card fields are sensitive Canadian PII — treat carefully.</p>
+
+<form class="card" method="post" action="{{ action }}">
+  <div class="form-grid">
+    <div class="full">
+      <label for="name">Name *</label>
+      <input type="text" id="name" name="name" required value="{{ employee.name if employee else '' }}">
+    </div>
+    <div>
+      <label for="date_of_birth">Date of birth</label>
+      <input type="date" id="date_of_birth" name="date_of_birth" value="{{ employee.date_of_birth if employee else '' }}">
+    </div>
+    <div>
+      <label for="wage">Wage</label>
+      <input type="text" id="wage" name="wage" value="{{ employee.wage if employee else '' }}" placeholder="e.g. $28.50/hr">
+    </div>
+    <div class="full">
+      <label for="address">Address</label>
+      <input type="text" id="address" name="address" value="{{ employee.address if employee else '' }}">
+    </div>
+
+    <div>
+      <label for="drivers_license_number">Driver's license number</label>
+      <input type="text" id="drivers_license_number" name="drivers_license_number" value="{{ employee.drivers_license_number if employee else '' }}">
+    </div>
+    <div>
+      <label for="drivers_license_expiry">Driver's license expiration</label>
+      <input type="date" id="drivers_license_expiry" name="drivers_license_expiry" value="{{ employee.drivers_license_expiry if employee else '' }}">
+    </div>
+
+    <div class="sensitive">
+      <label for="health_card_number">Health card number (sensitive)</label>
+      <input type="text" id="health_card_number" name="health_card_number" value="{{ employee.health_card_number if employee else '' }}">
+      <p class="hint">Canadian health card — store only if required for your process.</p>
+    </div>
+    <div class="sensitive">
+      <label for="health_card_expiry">Health card expiration</label>
+      <input type="date" id="health_card_expiry" name="health_card_expiry" value="{{ employee.health_card_expiry if employee else '' }}">
+    </div>
+
+    <div>
+      <label for="company_start_date">Company start date</label>
+      <input type="date" id="company_start_date" name="company_start_date" value="{{ employee.company_start_date if employee else '' }}">
+      <p class="hint">Used for work anniversary notifications.</p>
+    </div>
+    <div>
+      <label for="date_of_hire">Date of hire</label>
+      <input type="date" id="date_of_hire" name="date_of_hire" value="{{ employee.date_of_hire if employee else '' }}">
+    </div>
+
+    <div>
+      <label for="training_stage">Training stage</label>
+      <input type="text" id="training_stage" name="training_stage" list="training_stages"
+             value="{{ employee.training_stage if employee else '' }}"
+             placeholder="Flexible — type or pick a stage">
+      <datalist id="training_stages">
+        {% for s in training_suggestions %}
+        <option value="{{ s }}">
+        {% endfor %}
+      </datalist>
+    </div>
+    <div>
+      <label for="training_due_date">Due for next training stage</label>
+      <input type="date" id="training_due_date" name="training_due_date" value="{{ employee.training_due_date if employee else '' }}">
+    </div>
+
+    <div class="full">
+      <label for="notes">Notes</label>
+      <textarea id="notes" name="notes">{{ employee.notes if employee else '' }}</textarea>
+    </div>
+
+    {% if employee %}
+    <div class="full">
+      <h3 style="margin:0.5rem 0 0;">Wage / promotion history (this save)</h3>
+      <p class="hint">If you change wage, a history row is added. Check Team Lead to log a promotion.</p>
+    </div>
+    <div>
+      <label for="history_effective_date">Effective date</label>
+      <input type="date" id="history_effective_date" name="history_effective_date">
+    </div>
+    <div>
+      <label for="history_note">History note (optional)</label>
+      <input type="text" id="history_note" name="history_note" placeholder="e.g. annual raise">
+    </div>
+    <div class="full">
+      <label>
+        <input type="checkbox" name="promoted_to_team_lead" value="1">
+        Promoted to Team Lead (logs a promotion on this date)
+      </label>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="actions">
+    <button class="btn" type="submit">Save</button>
+    {% if employee %}
+    <a class="btn btn-secondary" href="/employees/{{ employee.id }}">Cancel</a>
+    {% else %}
+    <a class="btn btn-secondary" href="/employees">Cancel</a>
+    {% endif %}
+  </div>
+</form>
+{% endblock %}

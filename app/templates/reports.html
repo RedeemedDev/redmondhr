@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Reports — RedmondHR{% endblock %}
+{% block content %}
+<h1>Reports</h1>
+<p class="lead">
+  Upcoming birthdays and work anniversaries (default {{ window_days }} days).
+  Anniversaries use <strong>company start date</strong>.
+</p>
+
+<form class="card" method="get" action="/reports" style="display:flex;gap:0.5rem;align-items:end;flex-wrap:wrap;">
+  <div>
+    <label for="days">Look-ahead days</label>
+    <input type="number" id="days" name="days" min="1" max="365" value="{{ window_days }}">
+  </div>
+  <button class="btn btn-secondary" type="submit">Update</button>
+  <a class="btn btn-secondary" href="/reports/export.csv?days={{ window_days }}&kind=all">Export CSV (both)</a>
+  <a class="btn btn-secondary" href="/reports/export.csv?days={{ window_days }}&kind=birthdays">Birthdays CSV</a>
+  <a class="btn btn-secondary" href="/reports/export.csv?days={{ window_days }}&kind=anniversaries">Anniversaries CSV</a>
+</form>
+
+<div class="card">
+  <h2>Upcoming birthdays</h2>
+  {% if birthdays %}
+  <table>
+    <thead><tr><th>Employee</th><th>Next birthday</th><th>When</th></tr></thead>
+    <tbody>
+    {% for i in birthdays %}
+      <tr>
+        <td><a href="/employees/{{ i.employee_id }}">{{ i.employee_name }}</a></td>
+        <td>{{ i.event_date }}</td>
+        <td>
+          {% if i.status == 'today' %}<span class="badge badge-today">Today</span>
+          {% elif i.status == 'overdue' %}<span class="badge badge-overdue">{{ i.days }}d</span>
+          {% else %}<span class="badge badge-upcoming">in {{ i.days }}d</span>{% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">No birthdays in this window.</p>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2>Upcoming anniversaries</h2>
+  <p class="hint">Based on company start date.</p>
+  {% if anniversaries %}
+  <table>
+    <thead><tr><th>Employee</th><th>Next anniversary</th><th>Milestone</th><th>When</th></tr></thead>
+    <tbody>
+    {% for i in anniversaries %}
+      <tr>
+        <td><a href="/employees/{{ i.employee_id }}">{{ i.employee_name }}</a></td>
+        <td>{{ i.event_date }}</td>
+        <td>{{ i.detail or '—' }}</td>
+        <td>
+          {% if i.status == 'today' %}<span class="badge badge-today">Today</span>
+          {% elif i.status == 'overdue' %}<span class="badge badge-overdue">{{ i.days }}d</span>
+          {% else %}<span class="badge badge-upcoming">in {{ i.days }}d</span>{% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">No anniversaries in this window.</p>
+  {% endif %}
+</div>
+{% endblock %}

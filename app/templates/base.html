@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}RedmondHR{% endblock %}</title>
+  <link rel="stylesheet" href="/static/styles.css">
+  <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/">RedmondHR</a>
+    <nav>
+      <a href="/">Dashboard</a>
+      <a href="/employees">Employees</a>
+      <a href="/notifications">Notifications</a>
+      <a href="/reports">Reports</a>
+    </nav>
+    <span class="spacer"></span>
+    <span class="meta">Redmond &amp; Associates · manager toolkit</span>
+  </header>
+  <main class="wrap">
+    {% block content %}{% endblock %}
+    <p class="footer-note">
+      Large company documents and shared files can continue to live in your existing company cloud storage;
+      RedmondHR holds manager HR records and uploads locally in <code>./data</code>.
+    </p>
+  </main>
+</body>
+</html>

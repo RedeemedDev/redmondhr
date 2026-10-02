@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}Notifications — RedmondHR{% endblock %}
+{% block content %}
+<h1>Notifications</h1>
+<p class="lead">
+  Default window: {{ window_days }} days. Includes overdue plus upcoming:
+  driver's license expiry, health card expiry, birthday, work anniversary
+  (based on <strong>company start date</strong>), and training stage due.
+</p>
+
+<form class="card" method="get" action="/notifications" style="display:flex;gap:0.5rem;align-items:end;max-width:420px;">
+  <div style="flex:1;">
+    <label for="days">Look-ahead days</label>
+    <input type="number" id="days" name="days" min="1" max="365" value="{{ window_days }}">
+  </div>
+  <button class="btn btn-secondary" type="submit">Update</button>
+</form>
+
+{% if overdue %}
+<div class="card">
+  <h2>Overdue ({{ overdue|length }})</h2>
+  <table>
+    <thead><tr><th>Employee</th><th>Item</th><th>Date</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+    {% for i in overdue %}
+      <tr>
+        <td><a href="/employees/{{ i.employee_id }}">{{ i.employee_name }}</a></td>
+        <td>{{ i.label }}{% if i.detail %} <span class="muted">({{ i.detail }})</span>{% endif %}</td>
+        <td>{{ i.event_date }}</td>
+        <td><span class="badge badge-overdue">{{ i.days }}d overdue</span></td>
+        <td>
+          <form method="post" action="/reminders/dismiss" style="margin:0">
+            <input type="hidden" name="event_key" value="{{ i.event_key }}">
+            <input type="hidden" name="employee_id" value="{{ i.employee_id }}">
+            <input type="hidden" name="kind" value="{{ i.kind }}">
+            <input type="hidden" name="event_date" value="{{ i.event_date }}">
+            <input type="hidden" name="next" value="/notifications?days={{ window_days }}">
+            <button type="submit" class="btn btn-secondary">Clear</button>
+          </form>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+<div class="card">
+  <h2>Upcoming ({{ upcoming|length }})</h2>
+  {% if upcoming %}
+  <table>
+    <thead><tr><th>Employee</th><th>Item</th><th>Date</th><th>When</th><th></th></tr></thead>
+    <tbody>
+    {% for i in upcoming %}
+      <tr>
+        <td><a href="/employees/{{ i.employee_id }}">{{ i.employee_name }}</a></td>
+        <td>{{ i.label }}{% if i.detail %} <span class="muted">({{ i.detail }})</span>{% endif %}</td>
+        <td>{{ i.event_date }}</td>
+        <td>
+          {% if i.status == 'today' %}
+            <span class="badge badge-today">Today</span>
+          {% else %}
+            <span class="badge badge-upcoming">in {{ i.days }}d</span>
+          {% endif %}
+        </td>
+        <td>
+          <form method="post" action="/reminders/dismiss" style="margin:0">
+            <input type="hidden" name="event_key" value="{{ i.event_key }}">
+            <input type="hidden" name="employee_id" value="{{ i.employee_id }}">
+            <input type="hidden" name="kind" value="{{ i.kind }}">
+            <input type="hidden" name="event_date" value="{{ i.event_date }}">
+            <input type="hidden" name="next" value="/notifications?days={{ window_days }}">
+            <button type="submit" class="btn btn-secondary">Clear</button>
+          </form>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">No upcoming items in this window.</p>
+  {% endif %}
+</div>
+{% endblock %}
