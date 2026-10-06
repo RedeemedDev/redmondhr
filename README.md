@@ -2,7 +2,7 @@
 
 Manager-only HR toolkit for **Redmond & Associates**.
 
-RedmondHR helps a manager keep employee records, expiry reminders, training stages, and review/disciplinary uploads on a local machine. It sits **alongside** company-wide cloud storage — large shared company documents and general info can continue to live there; this app focuses on manager HR workflows.
+RedmondHR helps a manager keep employee records, expiry reminders, roles/specialties, and review/disciplinary uploads on a local machine. It sits **alongside** company-wide cloud storage — large shared company documents and general info can continue to live there; this app focuses on manager HR workflows.
 
 **Out of scope for this MVP:** cloud hosting, payroll, leave management, mobile apps, RigReady.
 
@@ -11,24 +11,34 @@ RedmondHR helps a manager keep employee records, expiry reminders, training stag
 ## Features
 
 ### Employee records (CRUD)
-- Name, date of birth, address
+- Name, date of birth, phone, address
 - Driver's license number + expiration
 - Health card number + expiration (Canadian PII — treat as sensitive)
-- Company start date, date of hire, wage, notes
-- Training stage (flexible text / suggested stages) + due-for-next-stage date
+- Hire / start date (stored as both date_of_hire and company_start_date), wage, notes
+- Role (Mover Year 1–3 / Team Lead) + Specialty (None / AZ / Millwright) + Millwright level when applicable
+- Wage & promotion history (manual; Team Lead promotion checkbox on edit)
 - Uploads: past reviews and disciplinary documents (files on disk; metadata in SQLite)
 
 ### Notifications (default 30-day window)
 Upcoming **and** overdue:
 - Driver's license expiry
 - Health card expiry
-- Birthday
-- Work anniversary (**uses company start date**)
-- Training stage due date
+- Birthday (shows turning age)
+- Work anniversary (**uses hire / start date**)
+- Follow-Up Orientation (**hire / start date + 21 days**)
+- Probation Over (**hire / start date + 3 calendar months**)
+
+Dismissed reminders can be Cleared from the dashboard / notifications page.
+
+### Employees list sorting
+Click column headers to sort (▴ ascending / ▾ descending). Search (`q`) is preserved when toggling.
+- `?sort=name|hire|role|specialty|wage` with `?dir=asc|desc` (alias `order=`)
+- Natural ascending: name A→Z; hire earliest→latest; role Year 1→Team Lead; specialty Millwright (Y2→Full Cert)→AZ→None; wage low→high when parseable
+- Second click on the same header reverses; clicking a different header starts that column ascending
 
 ### Reports
 - Upcoming birthdays
-- Upcoming anniversaries (company start date)
+- Upcoming anniversaries (hire / start date)
 - CSV export for birthdays, anniversaries, or both
 
 ---

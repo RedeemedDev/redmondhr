@@ -5,6 +5,7 @@ Default window is 30 days; overdue items are always included.
 """
 from __future__ import annotations
 
+import calendar
 from datetime import date, datetime, timedelta
 from typing import Any
 
@@ -21,6 +22,14 @@ def _parse_date(value: str | None) -> date | None:
         except ValueError:
             continue
     return None
+
+
+def add_months(d: date, months: int) -> date:
+    """Add calendar months, clamping day to end of target month when needed."""
+    year = d.year + (d.month - 1 + months) // 12
+    month = (d.month - 1 + months) % 12 + 1
+    day = min(d.day, calendar.monthrange(year, month)[1])
+    return date(year, month, day)
 
 
 def _next_anniversary(event: date, today: date) -> date:
@@ -55,7 +64,11 @@ def build_notifications(
     window_days: int = 30,
     today: date | None = None,
 ) -> list[dict[str, Any]]:
-    """Build notification list for DL, health card, birthday, anniversary, training."""
+    """Build notification list for DL, health card, birthday, anniversary,
+    follow-up orientation, and probation end.
+
+    Training-stage due reminders were removed (role/specialty model).
+    """
     today = today or date.today()
     end = today + timedelta(days=window_days)
     items: list[dict[str, Any]] = []
@@ -68,7 +81,6 @@ def build_notifications(
         for field, label, kind in (
             ("drivers_license_expiry", "Driver's license expiry", "dl_expiry"),
             ("health_card_expiry", "Health card expiry", "health_card_expiry"),
-            ("training_due_date", "Training stage due", "training_due"),
         ):
             d = _parse_date(emp.get(field))
             if not d:
@@ -85,13 +97,12 @@ def build_notifications(
                         "event_date": d.isoformat(),
                         "days": days,
                         "status": classify_window(days),
-                        "detail": emp.get("training_stage") if kind == "training_due" else None,
+                        "detail": None,
                         "event_key": f"{kind}:{eid}:{d.isoformat()}",
                     }
                 )
 
         # Birthday (recurring)
-                # Birthday (recurring)
         dob = _parse_date(emp.get("date_of_birth"))
         if dob:
             nxt = _next_anniversary(dob, today)
@@ -130,6 +141,42 @@ def build_notifications(
                         "status": classify_window(days),
                         "detail": f"{anniv_years} year{'s' if anniv_years != 1 else ''}",
                         "event_key": f"anniversary:{eid}:{nxt.isoformat()}",
+                    }
+                )
+
+            # Follow-Up Orientation — company_start_date + 21 days
+            orientation_due = start + timedelta(days=21)
+            if orientation_due <= end:
+                days = _days_until(orientation_due, today)
+                items.append(
+                    {
+                        "employee_id": eid,
+                        "employee_name": name,
+                        "kind": "follow_up_orientation",
+                        "label": "Follow-Up Orientation",
+                        "event_date": orientation_due.isoformat(),
+                        "days": days,
+                        "status": classify_window(days),
+                        "detail": "3 weeks after start",
+                        "event_key": f"follow_up_orientation:{eid}:{orientation_due.isoformat()}",
+                    }
+                )
+
+            # Probation Over — company_start_date + 3 calendar months
+            probation_due = add_months(start, 3)
+            if probation_due <= end:
+                days = _days_until(probation_due, today)
+                items.append(
+                    {
+                        "employee_id": eid,
+                        "employee_name": name,
+                        "kind": "probation_over",
+                        "label": "Probation Over",
+                        "event_date": probation_due.isoformat(),
+                        "days": days,
+                        "status": classify_window(days),
+                        "detail": "3 months after start",
+                        "event_key": f"probation_over:{eid}:{probation_due.isoformat()}",
                     }
                 )
 

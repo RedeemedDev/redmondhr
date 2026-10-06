@@ -1,6 +1,7 @@
 """Employee and document CRUD operations."""
 from __future__ import annotations
 
+import re
 import shutil
 import uuid
 from datetime import date
@@ -13,6 +14,7 @@ from app.database import db_session, row_to_dict, rows_to_list
 EMPLOYEE_FIELDS = [
     "name",
     "date_of_birth",
+    "phone",
     "address",
     "drivers_license_number",
     "drivers_license_expiry",
@@ -22,25 +24,225 @@ EMPLOYEE_FIELDS = [
     "date_of_hire",
     "wage",
     "notes",
-    "training_stage",
-    "training_due_date",
+    "role",
+    "specialty",
+    "millwright_level",
 ]
 
 DOC_TYPES = ("review", "disciplinary", "other")
 HISTORY_TYPES = ("wage", "promotion")
 
+# Locked role / specialty / millwright level model
+ROLE_CHOICES = [
+    ("mover_year_1", "Mover Year 1"),
+    ("mover_year_2", "Mover Year 2"),
+    ("mover_year_3", "Mover Year 3"),
+    ("team_lead", "Team Lead"),
+]
+ROLE_LABELS = dict(ROLE_CHOICES)
+ROLE_SORT_ORDER = {
+    "mover_year_1": 1,
+    "mover_year_2": 2,
+    "mover_year_3": 3,
+    "team_lead": 4,
+}
 
-def list_employees(include_demo: bool = True) -> list[dict]:
+SPECIALTY_CHOICES = [
+    ("none", "None"),
+    ("az", "AZ"),
+    ("millwright", "Millwright"),
+]
+SPECIALTY_LABELS = dict(SPECIALTY_CHOICES)
+# List/sort: Millwrights first, then AZ, then None
+SPECIALTY_SORT_ORDER = {
+    "millwright": 1,
+    "az": 2,
+    "none": 3,
+}
+
+MILLWRIGHT_LEVEL_CHOICES = [
+    ("year_2", "Year 2"),
+    ("year_3", "Year 3"),
+    ("year_4", "Year 4"),
+    ("full_cert", "Full Cert"),
+]
+MILLWRIGHT_LEVEL_LABELS = dict(MILLWRIGHT_LEVEL_CHOICES)
+# Seniority ascending: Year 2 < Year 3 < Year 4 < Full Cert
+MILLWRIGHT_LEVEL_SORT_ORDER = {
+    "year_2": 1,
+    "year_3": 2,
+    "year_4": 3,
+    "full_cert": 4,
+}
+
+VALID_ROLES = set(ROLE_LABELS)
+VALID_SPECIALTIES = set(SPECIALTY_LABELS)
+VALID_MILLWRIGHT_LEVELS = set(MILLWRIGHT_LEVEL_LABELS)
+
+
+def role_label(value: str | None) -> str:
+    if not value:
+        return "—"
+    return ROLE_LABELS.get(value, value)
+
+
+def specialty_label(value: str | None, *, for_list: bool = False) -> str:
+    v = (value or "none").strip() or "none"
+    if for_list and v == "none":
+        return "—"
+    return SPECIALTY_LABELS.get(v, v)
+
+
+def millwright_level_label(value: str | None) -> str:
+    if not value:
+        return "—"
+    return MILLWRIGHT_LEVEL_LABELS.get(value, value)
+
+
+
+def sync_hire_and_start_dates(data: dict[str, Any]) -> dict[str, Any]:
+    """Write one hire/start input into both date_of_hire and company_start_date."""
+    out = dict(data)
+    hire = (out.get("date_of_hire") or "").strip()
+    start = (out.get("company_start_date") or "").strip()
+    shared = hire or start
+    out["date_of_hire"] = shared or None
+    out["company_start_date"] = shared or None
+    return out
+
+
+def normalize_employee_fields(data: dict[str, Any]) -> dict[str, Any]:
+    """Validate/normalize role, specialty, millwright_level; sync hire/start dates."""
+    out = sync_hire_and_start_dates(data)
+    role = (out.get("role") or "").strip()
+    if role and role not in VALID_ROLES:
+        role = ""
+    out["role"] = role or None
+
+    specialty = (out.get("specialty") or "none").strip() or "none"
+    if specialty not in VALID_SPECIALTIES:
+        specialty = "none"
+    out["specialty"] = specialty
+
+    level = (out.get("millwright_level") or "").strip() or None
+    if specialty != "millwright":
+        level = None
+    elif level and level not in VALID_MILLWRIGHT_LEVELS:
+        level = None
+    out["millwright_level"] = level
+    return out
+
+
+def _sort_key_role(emp: dict) -> tuple:
+    role = emp.get("role") or ""
+    return (ROLE_SORT_ORDER.get(role, 99), (emp.get("name") or "").lower())
+
+
+def _sort_key_specialty(emp: dict) -> tuple:
+    specialty = (emp.get("specialty") or "none").strip() or "none"
+    level = emp.get("millwright_level") or ""
+    # Millwrights sub-ranked by level; non-millwrights get 0 for level slot
+    level_rank = (
+        MILLWRIGHT_LEVEL_SORT_ORDER.get(level, 0) if specialty == "millwright" else 0
+    )
+    return (
+        SPECIALTY_SORT_ORDER.get(specialty, 99),
+        level_rank,
+        (emp.get("name") or "").lower(),
+    )
+
+
+def _sort_key_name(emp: dict) -> tuple:
+    return ((emp.get("name") or "").lower(),)
+
+
+def _shared_hire_date(emp: dict) -> str | None:
+    """Prefer date_of_hire, fall back to company_start_date (kept in sync on save)."""
+    for key in ("date_of_hire", "company_start_date"):
+        val = (emp.get(key) or "").strip()
+        if val:
+            return val
+    return None
+
+
+def _sort_key_hire(emp: dict) -> tuple:
+    # Chronological; nulls last; then name
+    d = _shared_hire_date(emp)
+    if not d:
+        return (1, "", (emp.get("name") or "").lower())
+    return (0, d, (emp.get("name") or "").lower())
+
+
+def _wage_sort_number(wage: str | None) -> float | None:
+    """Parse leading number from wage text like '$28.50/hr'."""
+    s = (wage or "").strip()
+    if not s:
+        return None
+    m = re.search(r"(\d+(?:\.\d+)?)", s.replace(",", ""))
+    if not m:
+        return None
+    try:
+        return float(m.group(1))
+    except ValueError:
+        return None
+
+
+def _sort_key_wage(emp: dict) -> tuple:
+    # Numeric-ish when possible; else string; nulls last; then name
+    raw = (emp.get("wage") or "").strip()
+    name = (emp.get("name") or "").lower()
+    if not raw:
+        return (1, 0.0, "", name)
+    num = _wage_sort_number(raw)
+    if num is not None:
+        return (0, 0, num, name)
+    return (0, 1, raw.lower(), name)
+
+
+def list_employees(
+    include_demo: bool = True,
+    sort: str = "name",
+    direction: str = "asc",
+) -> list[dict]:
+    """List employees sorted by column.
+
+    Natural ascending meanings:
+      name: A→Z
+      hire: earliest→latest (nulls last)
+      role: Year 1 → Team Lead
+      specialty: Millwright (Y2→…→Full Cert) → AZ → None
+      wage: low→high when parseable (nulls last)
+
+    direction 'desc' (or 'order=desc') reverses that natural order.
+    """
     with db_session() as conn:
         if include_demo:
-            rows = conn.execute(
-                "SELECT * FROM employees ORDER BY name COLLATE NOCASE"
-            ).fetchall()
+            rows = conn.execute("SELECT * FROM employees").fetchall()
         else:
             rows = conn.execute(
-                "SELECT * FROM employees WHERE is_demo = 0 ORDER BY name COLLATE NOCASE"
+                "SELECT * FROM employees WHERE is_demo = 0"
             ).fetchall()
-        return rows_to_list(rows)
+        employees = rows_to_list(rows)
+
+    sort = (sort or "name").strip().lower()
+    direction = (direction or "asc").strip().lower()
+    if direction in ("desc", "descending", "down"):
+        reverse = True
+    else:
+        reverse = False
+
+    if sort in ("hire", "hire_date"):
+        key = _sort_key_hire
+    elif sort == "wage":
+        key = _sort_key_wage
+    elif sort == "role":
+        key = _sort_key_role
+    elif sort == "specialty":
+        key = _sort_key_specialty
+    else:
+        key = _sort_key_name
+    employees.sort(key=key, reverse=reverse)
+    return employees
 
 
 def get_employee(employee_id: int) -> dict | None:
@@ -120,6 +322,7 @@ def ensure_wage_history_backfill(employee_id: int) -> None:
 
 
 def create_employee(data: dict[str, Any], is_demo: bool = False) -> int:
+    data = normalize_employee_fields(data)
     values = [data.get(f) or None for f in EMPLOYEE_FIELDS]
     with db_session() as conn:
         cur = conn.execute(
@@ -153,6 +356,7 @@ def update_employee(
     if not existing:
         return False
 
+    data = normalize_employee_fields(data)
     old_wage = (existing.get("wage") or "").strip()
     new_wage = (data.get("wage") or "").strip()
     effective = (history_effective_date or "").strip() or date.today().isoformat()

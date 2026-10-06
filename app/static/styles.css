@@ -150,6 +150,8 @@ label {
   margin-bottom: 0.25rem;
 }
 input[type="text"],
+input[type="tel"],
+input[type="email"],
 input[type="date"],
 input[type="password"],
 input[type="number"],
@@ -163,6 +165,8 @@ textarea {
   border-radius: 8px;
   font: inherit;
   background: #fff;
+  -webkit-appearance: none;
+  appearance: none;
 }
 textarea { min-height: 90px; resize: vertical; }
 .hint { font-size: 0.8rem; color: var(--muted); margin-top: 0.2rem; }

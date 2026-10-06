@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS employees (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
     date_of_birth TEXT,
+    phone TEXT,
     address TEXT,
     drivers_license_number TEXT,
     drivers_license_expiry TEXT,
@@ -21,6 +22,9 @@ CREATE TABLE IF NOT EXISTS employees (
     date_of_hire TEXT,
     wage TEXT,
     notes TEXT,
+    role TEXT,
+    specialty TEXT DEFAULT 'none',
+    millwright_level TEXT,
     training_stage TEXT,
     training_due_date TEXT,
     is_demo INTEGER NOT NULL DEFAULT 0,
@@ -67,6 +71,15 @@ CREATE INDEX IF NOT EXISTS idx_dismissed_key ON dismissed_reminders(event_key);
 CREATE INDEX IF NOT EXISTS idx_wage_history_employee ON wage_history(employee_id);
 """
 
+# Columns added after the original schema — applied via migrate_schema().
+# training_stage / training_due_date are left in place if present but unused.
+_EMPLOYEE_COLUMN_MIGRATIONS = [
+    ("phone", "TEXT"),
+    ("role", "TEXT"),
+    ("specialty", "TEXT DEFAULT 'none'"),
+    ("millwright_level", "TEXT"),
+]
+
 
 _schema_ready = False
 
@@ -79,9 +92,27 @@ def get_connection() -> sqlite3.Connection:
     conn.execute("PRAGMA foreign_keys = ON")
     if not _schema_ready:
         conn.executescript(SCHEMA)
+        migrate_schema(conn)
         conn.commit()
         _schema_ready = True
     return conn
+
+
+def _existing_columns(conn: sqlite3.Connection, table: str) -> set[str]:
+    rows = conn.execute(f"PRAGMA table_info({table})").fetchall()
+    return {r["name"] for r in rows}
+
+
+def migrate_schema(conn: sqlite3.Connection) -> None:
+    """Add missing columns on existing DBs (ALTER TABLE ADD COLUMN IF NOT EXISTS style)."""
+    existing = _existing_columns(conn, "employees")
+    for col, col_type in _EMPLOYEE_COLUMN_MIGRATIONS:
+        if col not in existing:
+            conn.execute(f"ALTER TABLE employees ADD COLUMN {col} {col_type}")
+    # Ensure specialty default for any NULL rows from older partial migrations
+    conn.execute(
+        "UPDATE employees SET specialty = 'none' WHERE specialty IS NULL OR specialty = ''"
+    )
 
 
 @contextmanager
@@ -101,6 +132,7 @@ def init_db() -> None:
     ensure_data_dirs()
     with db_session() as conn:
         conn.executescript(SCHEMA)
+        migrate_schema(conn)
 
 
 def row_to_dict(row: sqlite3.Row | None) -> dict | None:

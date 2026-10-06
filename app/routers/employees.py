@@ -14,43 +14,74 @@ from app.config import UPLOADS_DIR
 router = APIRouter(tags=["employees"])
 templates = Jinja2Templates(directory=str(Path(__file__).resolve().parent.parent / "templates"))
 
-TRAINING_SUGGESTIONS = [
-    "Orientation",
-    "Stage 1 — Basics",
-    "Stage 2 — Site safety",
-    "Stage 3 — Equipment",
-    "Stage 4 — Lead",
-    "Complete",
-]
-
 
 def _form_to_employee(form: dict) -> dict:
+    # Single UI field date_of_hire; copy into both columns for notification logic.
+    hire = form.get("date_of_hire") or form.get("company_start_date") or ""
     return {
         "name": (form.get("name") or "").strip(),
         "date_of_birth": form.get("date_of_birth") or "",
+        "phone": (form.get("phone") or "").strip(),
         "address": (form.get("address") or "").strip(),
         "drivers_license_number": (form.get("drivers_license_number") or "").strip(),
         "drivers_license_expiry": form.get("drivers_license_expiry") or "",
         "health_card_number": (form.get("health_card_number") or "").strip(),
         "health_card_expiry": form.get("health_card_expiry") or "",
-        "company_start_date": form.get("company_start_date") or "",
-        "date_of_hire": form.get("date_of_hire") or "",
+        "company_start_date": hire,
+        "date_of_hire": hire,
         "wage": (form.get("wage") or "").strip(),
         "notes": (form.get("notes") or "").strip(),
-        "training_stage": (form.get("training_stage") or "").strip(),
-        "training_due_date": form.get("training_due_date") or "",
+        "role": (form.get("role") or "").strip(),
+        "specialty": (form.get("specialty") or "none").strip() or "none",
+        "millwright_level": (form.get("millwright_level") or "").strip(),
     }
 
 
+def _form_context(**extra):
+    ctx = {
+        "role_choices": crud.ROLE_CHOICES,
+        "specialty_choices": crud.SPECIALTY_CHOICES,
+        "millwright_level_choices": crud.MILLWRIGHT_LEVEL_CHOICES,
+        "role_label": crud.role_label,
+        "specialty_label": crud.specialty_label,
+        "millwright_level_label": crud.millwright_level_label,
+    }
+    ctx.update(extra)
+    return ctx
+
+
 @router.get("/employees", response_class=HTMLResponse)
-async def employees_list(request: Request, q: str = ""):
-    employees = crud.list_employees()
+async def employees_list(
+    request: Request,
+    q: str = "",
+    sort: str = "name",
+    dir: str = "",
+    order: str = "",
+):
+    sort = (sort or "name").strip().lower()
+    if sort == "hire_date":
+        sort = "hire"
+    if sort not in ("name", "role", "specialty", "hire", "wage"):
+        sort = "name"
+    # Prefer dir=; accept order= as alias when dir omitted
+    direction = (dir or order or "asc").strip().lower()
+    if direction in ("desc", "descending", "down"):
+        direction = "desc"
+    else:
+        direction = "asc"
+    employees = crud.list_employees(sort=sort, direction=direction)
     if q:
         ql = q.lower()
         employees = [e for e in employees if ql in (e.get("name") or "").lower()]
     return templates.TemplateResponse(
         "employees_list.html",
-        {"request": request, "employees": employees, "q": q},
+        _form_context(
+            request=request,
+            employees=employees,
+            q=q,
+            sort=sort,
+            dir=direction,
+        ),
     )
 
 
@@ -58,13 +89,12 @@ async def employees_list(request: Request, q: str = ""):
 async def employee_new_form(request: Request):
     return templates.TemplateResponse(
         "employee_form.html",
-        {
-            "request": request,
-            "employee": None,
-            "action": "/employees/new",
-            "title": "Add employee",
-            "training_suggestions": TRAINING_SUGGESTIONS,
-        },
+        _form_context(
+            request=request,
+            employee=None,
+            action="/employees/new",
+            title="Add employee",
+        ),
     )
 
 
@@ -73,36 +103,38 @@ async def employee_create(
     request: Request,
     name: str = Form(...),
     date_of_birth: str = Form(""),
+    phone: str = Form(""),
     address: str = Form(""),
     drivers_license_number: str = Form(""),
     drivers_license_expiry: str = Form(""),
     health_card_number: str = Form(""),
     health_card_expiry: str = Form(""),
-    company_start_date: str = Form(""),
     date_of_hire: str = Form(""),
     wage: str = Form(""),
     notes: str = Form(""),
-    training_stage: str = Form(""),
-    training_due_date: str = Form(""),
+    role: str = Form(...),
+    specialty: str = Form("none"),
+    millwright_level: str = Form(""),
 ):
     data = _form_to_employee(
         {
             "name": name,
             "date_of_birth": date_of_birth,
+            "phone": phone,
             "address": address,
             "drivers_license_number": drivers_license_number,
             "drivers_license_expiry": drivers_license_expiry,
             "health_card_number": health_card_number,
             "health_card_expiry": health_card_expiry,
-            "company_start_date": company_start_date,
             "date_of_hire": date_of_hire,
             "wage": wage,
             "notes": notes,
-            "training_stage": training_stage,
-            "training_due_date": training_due_date,
+            "role": role,
+            "specialty": specialty,
+            "millwright_level": millwright_level,
         }
     )
-    if not data["name"]:
+    if not data["name"] or not data["role"]:
         return RedirectResponse("/employees/new", status_code=303)
     eid = crud.create_employee(data)
     return RedirectResponse(f"/employees/{eid}", status_code=303)
@@ -118,13 +150,13 @@ async def employee_detail(request: Request, employee_id: int):
     wage_history = crud.list_wage_history(employee_id)
     return templates.TemplateResponse(
         "employee_detail.html",
-        {
-            "request": request,
-            "employee": employee,
-            "documents": documents,
-            "doc_types": crud.DOC_TYPES,
-            "wage_history": wage_history,
-        },
+        _form_context(
+            request=request,
+            employee=employee,
+            documents=documents,
+            doc_types=crud.DOC_TYPES,
+            wage_history=wage_history,
+        ),
     )
 
 
@@ -135,13 +167,12 @@ async def employee_edit_form(request: Request, employee_id: int):
         return RedirectResponse("/employees", status_code=303)
     return templates.TemplateResponse(
         "employee_form.html",
-        {
-            "request": request,
-            "employee": employee,
-            "action": f"/employees/{employee_id}/edit",
-            "title": f"Edit — {employee['name']}",
-            "training_suggestions": TRAINING_SUGGESTIONS,
-        },
+        _form_context(
+            request=request,
+            employee=employee,
+            action=f"/employees/{employee_id}/edit",
+            title=f"Edit — {employee['name']}",
+        ),
     )
 
 
@@ -150,17 +181,18 @@ async def employee_update(
     employee_id: int,
     name: str = Form(...),
     date_of_birth: str = Form(""),
+    phone: str = Form(""),
     address: str = Form(""),
     drivers_license_number: str = Form(""),
     drivers_license_expiry: str = Form(""),
     health_card_number: str = Form(""),
     health_card_expiry: str = Form(""),
-    company_start_date: str = Form(""),
     date_of_hire: str = Form(""),
     wage: str = Form(""),
     notes: str = Form(""),
-    training_stage: str = Form(""),
-    training_due_date: str = Form(""),
+    role: str = Form(...),
+    specialty: str = Form("none"),
+    millwright_level: str = Form(""),
     history_effective_date: str = Form(""),
     promoted_to_team_lead: str = Form(""),
     history_note: str = Form(""),
@@ -171,19 +203,22 @@ async def employee_update(
         {
             "name": name,
             "date_of_birth": date_of_birth,
+            "phone": phone,
             "address": address,
             "drivers_license_number": drivers_license_number,
             "drivers_license_expiry": drivers_license_expiry,
             "health_card_number": health_card_number,
             "health_card_expiry": health_card_expiry,
-            "company_start_date": company_start_date,
             "date_of_hire": date_of_hire,
             "wage": wage,
             "notes": notes,
-            "training_stage": training_stage,
-            "training_due_date": training_due_date,
+            "role": role,
+            "specialty": specialty,
+            "millwright_level": millwright_level,
         }
     )
+    if not data["name"] or not data["role"]:
+        return RedirectResponse(f"/employees/{employee_id}/edit", status_code=303)
     crud.update_employee(
         employee_id,
         data,

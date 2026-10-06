@@ -23,16 +23,19 @@
   <h2>Profile</h2>
   <div class="form-grid">
     <div class="kv"><dt>Date of birth</dt><dd>{{ employee.date_of_birth or '—' }}</dd></div>
+    <div class="kv"><dt>Phone</dt><dd>{{ employee.phone or '—' }}</dd></div>
     <div class="kv"><dt>Wage</dt><dd>{{ employee.wage or '—' }}</dd></div>
     <div class="kv full"><dt>Address</dt><dd>{{ employee.address or '—' }}</dd></div>
     <div class="kv"><dt>Driver's license #</dt><dd>{{ employee.drivers_license_number or '—' }}</dd></div>
     <div class="kv"><dt>DL expiration</dt><dd>{{ employee.drivers_license_expiry or '—' }}</dd></div>
     <div class="kv sensitive"><dt>Health card # (sensitive)</dt><dd>{{ employee.health_card_number or '—' }}</dd></div>
     <div class="kv sensitive"><dt>Health card expiration</dt><dd>{{ employee.health_card_expiry or '—' }}</dd></div>
-    <div class="kv"><dt>Company start date</dt><dd>{{ employee.company_start_date or '—' }} <span class="muted">(anniversary)</span></dd></div>
-    <div class="kv"><dt>Date of hire</dt><dd>{{ employee.date_of_hire or '—' }}</dd></div>
-    <div class="kv"><dt>Training stage</dt><dd>{{ employee.training_stage or '—' }}</dd></div>
-    <div class="kv"><dt>Training due</dt><dd>{{ employee.training_due_date or '—' }}</dd></div>
+    <div class="kv"><dt>Hire / start date</dt><dd>{{ employee.date_of_hire or employee.company_start_date or '—' }} <span class="muted">(anniversaries, orientation, probation)</span></dd></div>
+    <div class="kv"><dt>Role</dt><dd>{{ role_label(employee.role) }}</dd></div>
+    <div class="kv"><dt>Specialty</dt><dd>{{ specialty_label(employee.specialty) }}</dd></div>
+    {% if employee.specialty == 'millwright' and employee.millwright_level %}
+    <div class="kv"><dt>Millwright level</dt><dd>{{ millwright_level_label(employee.millwright_level) }}</dd></div>
+    {% endif %}
     <div class="kv full"><dt>Notes</dt><dd>{{ employee.notes or '—' }}</dd></div>
   </div>
 </div>

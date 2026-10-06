@@ -15,6 +15,10 @@
       <input type="date" id="date_of_birth" name="date_of_birth" value="{{ employee.date_of_birth if employee else '' }}">
     </div>
     <div>
+      <label for="phone">Phone</label>
+      <input type="text" id="phone" name="phone" inputmode="tel" autocomplete="tel" value="{{ employee.phone if employee else '' }}" placeholder="e.g. 613-555-0100">
+    </div>
+    <div>
       <label for="wage">Wage</label>
       <input type="text" id="wage" name="wage" value="{{ employee.wage if employee else '' }}" placeholder="e.g. $28.50/hr">
     </div>
@@ -43,29 +47,37 @@
     </div>
 
     <div>
-      <label for="company_start_date">Company start date</label>
-      <input type="date" id="company_start_date" name="company_start_date" value="{{ employee.company_start_date if employee else '' }}">
-      <p class="hint">Used for work anniversary notifications.</p>
-    </div>
-    <div>
-      <label for="date_of_hire">Date of hire</label>
-      <input type="date" id="date_of_hire" name="date_of_hire" value="{{ employee.date_of_hire if employee else '' }}">
+      <label for="date_of_hire">Hire / start date</label>
+      <input type="date" id="date_of_hire" name="date_of_hire" value="{{ (employee.date_of_hire or employee.company_start_date) if employee else '' }}">
+      <p class="hint">Anniversaries, follow-up orientation, and probation reminders all use this date.</p>
     </div>
 
     <div>
-      <label for="training_stage">Training stage</label>
-      <input type="text" id="training_stage" name="training_stage" list="training_stages"
-             value="{{ employee.training_stage if employee else '' }}"
-             placeholder="Flexible — type or pick a stage">
-      <datalist id="training_stages">
-        {% for s in training_suggestions %}
-        <option value="{{ s }}">
+      <label for="role">Role *</label>
+      <select id="role" name="role" required>
+        <option value="" {% if not employee or not employee.role %}selected{% endif %}>Select role…</option>
+        {% for value, label in role_choices %}
+        <option value="{{ value }}" {% if employee and employee.role == value %}selected{% endif %}>{{ label }}</option>
         {% endfor %}
-      </datalist>
+      </select>
     </div>
     <div>
-      <label for="training_due_date">Due for next training stage</label>
-      <input type="date" id="training_due_date" name="training_due_date" value="{{ employee.training_due_date if employee else '' }}">
+      <label for="specialty">Specialty</label>
+      <select id="specialty" name="specialty">
+        {% for value, label in specialty_choices %}
+        <option value="{{ value }}" {% if (employee.specialty if employee else 'none') == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div id="millwright-level-wrap">
+      <label for="millwright_level">Millwright level</label>
+      <select id="millwright_level" name="millwright_level">
+        <option value="">—</option>
+        {% for value, label in millwright_level_choices %}
+        <option value="{{ value }}" {% if employee and employee.millwright_level == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+      <p class="hint">Only applies when Specialty is Millwright.</p>
     </div>
 
     <div class="full">
@@ -104,4 +116,22 @@
     {% endif %}
   </div>
 </form>
+
+<script>
+(function () {
+  var specialty = document.getElementById('specialty');
+  var wrap = document.getElementById('millwright-level-wrap');
+  var level = document.getElementById('millwright_level');
+  function sync() {
+    var isMw = specialty && specialty.value === 'millwright';
+    if (wrap) wrap.style.opacity = isMw ? '1' : '0.55';
+    if (level) level.disabled = !isMw;
+    if (!isMw && level) level.value = '';
+  }
+  if (specialty) {
+    specialty.addEventListener('change', sync);
+    sync();
+  }
+})();
+</script>
 {% endblock %}

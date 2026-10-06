@@ -11,24 +11,52 @@
   </div>
 </div>
 
-<form class="card" method="get" action="/employees" style="display:flex;gap:0.5rem;align-items:end;">
-  <div style="flex:1;">
+<form class="card" method="get" action="/employees" style="display:flex;gap:0.5rem;align-items:end;flex-wrap:wrap;">
+  <div style="flex:1;min-width:12rem;">
     <label for="q">Search by name</label>
     <input type="search" id="q" name="q" value="{{ q }}" placeholder="e.g. Chen">
   </div>
+  {# Preserve current sort when searching #}
+  <input type="hidden" name="sort" value="{{ sort }}">
+  <input type="hidden" name="dir" value="{{ dir }}">
   <button class="btn btn-secondary" type="submit">Search</button>
-  {% if q %}<a class="btn btn-secondary" href="/employees">Clear</a>{% endif %}
+  {% if q %}<a class="btn btn-secondary" href="/employees?sort={{ sort }}&amp;dir={{ dir }}">Clear search</a>{% endif %}
 </form>
+
+{% macro sort_href(col) -%}
+{%- if sort == col and dir == 'asc' -%}
+/employees?sort={{ col }}&amp;dir=desc{% if q %}&amp;q={{ q|urlencode }}{% endif %}
+{%- else -%}
+/employees?sort={{ col }}&amp;dir=asc{% if q %}&amp;q={{ q|urlencode }}{% endif %}
+{%- endif -%}
+{%- endmacro %}
+
+{% macro sort_indicator(col) -%}
+{%- if sort == col -%}
+{%- if dir == 'desc' %} ▾{% else %} ▴{% endif -%}
+{%- endif -%}
+{%- endmacro %}
 
 <div class="card">
   {% if employees %}
   <table>
     <thead>
       <tr>
-        <th>Name</th>
-        <th>Hire / start</th>
-        <th>Training</th>
-        <th>Wage</th>
+        <th>
+          <a href="{{ sort_href('name') }}" title="Sort by name">Name{{ sort_indicator('name') }}</a>
+        </th>
+        <th>
+          <a href="{{ sort_href('hire') }}" title="Sort by hire / start date">Hire / start{{ sort_indicator('hire') }}</a>
+        </th>
+        <th>
+          <a href="{{ sort_href('role') }}" title="Sort by role">Role{{ sort_indicator('role') }}</a>
+        </th>
+        <th>
+          <a href="{{ sort_href('specialty') }}" title="Sort by specialty">Specialty{{ sort_indicator('specialty') }}</a>
+        </th>
+        <th>
+          <a href="{{ sort_href('wage') }}" title="Sort by wage">Wage{{ sort_indicator('wage') }}</a>
+        </th>
         <th></th>
       </tr>
     </thead>
@@ -39,13 +67,14 @@
           <a href="/employees/{{ e.id }}"><strong>{{ e.name }}</strong></a>
           {% if e.is_demo %}<span class="badge badge-demo">DEMO</span>{% endif %}
         </td>
+        <td>{{ e.date_of_hire or e.company_start_date or '—' }}</td>
+        <td>{{ role_label(e.role) }}</td>
         <td>
-          <span class="muted">Hire:</span> {{ e.date_of_hire or '—' }}<br>
-          <span class="muted">Start:</span> {{ e.company_start_date or '—' }}
-        </td>
-        <td>
-          {{ e.training_stage or '—' }}
-          {% if e.training_due_date %}<br><span class="muted">Due {{ e.training_due_date }}</span>{% endif %}
+          {% if e.specialty == 'millwright' and e.millwright_level %}
+            Millwright ({{ millwright_level_label(e.millwright_level) }})
+          {% else %}
+            {{ specialty_label(e.specialty, for_list=True) }}
+          {% endif %}
         </td>
         <td>{{ e.wage or '—' }}</td>
         <td><a class="btn btn-sm btn-secondary" href="/employees/{{ e.id }}/edit">Edit</a></td>
