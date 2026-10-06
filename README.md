@@ -50,7 +50,11 @@ Click column headers to sort (▴ ascending / ▾ descending). Search (`q`) is p
 
 ---
 
-## Install & run (Windows-friendly)
+## Install & run (dev / foreground)
+
+For day-to-day offline use on a work laptop, prefer **Offline / double-click start** below.
+
+### Windows-friendly
 
 Open **Command Prompt** or **PowerShell** in this folder (`redmondhr`).
 
@@ -102,6 +106,126 @@ Other useful env vars:
 | `REDMONDHR_DATA_DIR` | `./data` | SQLite + uploads folder |
 | `REDMONDHR_WINDOW_DAYS` | `30` | Default notification window |
 | `REDMONDHR_LOAD_DEMO` | `1` | Load demo employees when DB is empty |
+
+---
+
+## Offline / double-click start
+
+Once dependencies are installed in `.venv`, you can run RedmondHR **without internet**. Starting opens a small console window; **closing that window stops the server** (normal app lifecycle).
+
+### Windows Desktop + WSL Ubuntu (Adam's setup)
+
+Adam develops in **Ubuntu/WSL** via VS Code. The project lives at:
+
+`\\wsl.localhost\Ubuntu\home\adamredmond\workspace\redmondhr`
+
+His Windows Desktop (OneDrive) is typically:
+
+`C:\Users\AdamRedmond\OneDrive - Redmond Movers\Desktop`
+
+**Important:** CMD cannot use a UNC path as the current directory, and a `.lnk` cannot reliably set `TargetPath` / `WorkingDirectory` to a WSL UNC path (PowerShell `ArgumentException`). The Desktop shortcut therefore launches via `wsl.exe` with `--cd` (Linux path), and `WorkingDirectory` is `%USERPROFILE%` (or System32) — **never** the UNC project path.
+
+#### One-time install inside WSL (needs internet once)
+
+```bash
+cd /home/adamredmond/workspace/redmondhr
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+chmod +x start-redmondhr.sh stop-redmondhr.sh
+```
+
+#### Drop RedmondHR.lnk on the OneDrive Desktop (PowerShell, run NOW)
+
+From **Windows PowerShell** (any folder — no need to cd into the project):
+
+```powershell
+$d="$env:USERPROFILE\OneDrive - Redmond Movers\Desktop"; if(!(Test-Path $d)){$d=[Environment]::GetFolderPath('Desktop')}; $s=(New-Object -ComObject WScript.Shell).CreateShortcut((Join-Path $d 'RedmondHR.lnk')); $s.TargetPath='wsl.exe'; $s.Arguments='-d Ubuntu --cd /home/adamredmond/workspace/redmondhr -- bash ./start-redmondhr.sh'; $s.WorkingDirectory=$env:USERPROFILE; $s.WindowStyle=1; $s.Description='Start RedmondHR (WSL Ubuntu)'; $s.IconLocation='shell32.dll,165'; $s.Save(); Write-Host "Installed:" $s.FullName
+```
+
+That creates **RedmondHR.lnk** which runs:
+
+`wsl.exe -d Ubuntu --cd /home/adamredmond/workspace/redmondhr -- bash ./start-redmondhr.sh`
+
+#### Installer script (detects WSL UNC or accepts flags)
+
+From PowerShell, pointing at the project UNC (or after extracting updates):
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File "\\wsl.localhost\Ubuntu\home\adamredmond\workspace\redmondhr\install-desktop-shortcut.ps1"
+```
+
+Or with explicit flags (no UNC detection needed):
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File "\\wsl.localhost\Ubuntu\home\adamredmond\workspace\redmondhr\install-desktop-shortcut.ps1" -WslDistro Ubuntu -WslLinuxPath /home/adamredmond/workspace/redmondhr
+```
+
+`install-desktop-shortcut.bat` also works when double-clicked from the WSL UNC share **without** `cd`ing into it; pass `--wsl Ubuntu /home/adamredmond/workspace/redmondhr` to force WSL mode. Use `--no-start-menu` to skip the Start Menu entry.
+
+The installer also writes a **RedmondHR.bat** fallback on the Desktop (same `wsl.exe` command) in WSL mode.
+
+Then double-click **RedmondHR** on the Desktop (or Start Menu). A **console window stays open** (WindowStyle normal). `start-redmondhr.sh` opens the **Windows** default browser when it detects WSL, then waits in the foreground. **Close that console window to stop RedmondHR** (Ctrl+C also stops). No separate stop shortcut is required for normal use.
+
+#### Native Windows project folder (non-WSL)
+
+If the repo is on a real drive letter (not `\\wsl...`), the installer writes a `.lnk` to `start-redmondhr.bat` instead:
+
+```bat
+install-desktop-shortcut.bat
+start-redmondhr.bat
+stop-redmondhr.bat
+```
+
+Adam's primary path is **WSL** (close-console-to-quit). Native `start-redmondhr.bat` still:
+- Use `.venv` (exits with setup instructions if missing; prefers `pythonw` so the server has no console)
+- Start uvicorn in the **background** on `http://127.0.0.1:8000`
+- Open your default browser
+- Append logs to `data\redmondhr.log`
+- Write a pid file at `data\redmondhr.pid`
+- If already running on port 8000, just open the browser
+- Stop with `stop-redmondhr.bat` (native Windows does not yet use the close-window lifecycle)
+
+#### Quit (normal)
+
+**Close the RedmondHR console window** (or press Ctrl+C in it). The launcher EXIT trap stops uvicorn via the pid file.
+
+#### Emergency stop (optional)
+
+Only if the console was killed without cleanup, or you started uvicorn some other way:
+
+```bash
+# inside Ubuntu/WSL:
+/home/adamredmond/workspace/redmondhr/stop-redmondhr.sh
+# or:
+wsl.exe -d Ubuntu --cd /home/adamredmond/workspace/redmondhr -- bash ./stop-redmondhr.sh
+```
+
+### Linux (AdamLenovo / optional)
+
+#### One-time install (needs internet once)
+
+```bash
+cd /path/to/redmondhr
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+#### Start / quit / shortcut
+
+```bash
+./start-redmondhr.sh              # console stays open; close it (or Ctrl+C) to quit
+./install-desktop-shortcut.sh     # optional: ~/Desktop + app menu (Terminal=true)
+# emergency only:
+./stop-redmondhr.sh
+```
+
+The Linux installer writes a trusted-ish `.desktop` entry with absolute paths and `Terminal=true` so closing the terminal stops the server.
+
+### Dev / foreground (reload)
+
+For development with auto-reload, keep using the classic foreground command from **Install & run** above (`uvicorn … --reload`).
 
 ---
 

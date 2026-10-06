@@ -1,0 +1,15 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=RedmondHR
+Comment=Manager HR toolkit for Redmond & Associates (local)
+# Edit Exec and Path to the absolute location of your redmondhr folder, then:
+#   chmod +x redmondhr.desktop start-redmondhr.sh
+#   cp redmondhr.desktop ~/Desktop/   (or ~/.local/share/applications/)
+# Or run: ./install-desktop-shortcut.sh
+Exec=PLACEHOLDER_ROOT/start-redmondhr.sh
+Path=PLACEHOLDER_ROOT
+Icon=applications-office
+Terminal=true
+Categories=Office;Utility;
+StartupNotify=false

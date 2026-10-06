@@ -31,3 +31,8 @@ Thumbs.db
 
 # Uploads outside data/
 uploads/
+
+# Launcher runtime
+*.pid
+*.log
+logs/
